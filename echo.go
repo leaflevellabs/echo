@@ -62,6 +62,7 @@ type (
 		DisableHTTP2     bool
 		Debug            bool
 		HTTPErrorHandler HTTPErrorHandler
+		Finalizer        FinalizeHandler
 		Binder           Binder
 		Validator        Validator
 		Renderer         Renderer
@@ -104,6 +105,9 @@ type (
 	// HTTPErrorHandler is a centralized HTTP error handler.
 	HTTPErrorHandler func(error, Context)
 
+	// Handles completion of a request transaction
+	FinalizeHandler func(Context)
+	
 	// Validator is the interface that wraps the Validate function.
 	Validator interface {
 		Validate(i interface{}) error
@@ -250,6 +254,7 @@ func New() (e *Echo) {
 		Color:           color.New(),
 	}
 	e.HTTPErrorHandler = e.DefaultHTTPErrorHandler
+	e.Finalizer = e.DefaultFinalizeHandler
 	e.Binder = &DefaultBinder{}
 	e.Logger.SetLevel(log.OFF)
 	e.stdLogger = slog.New(e.Logger.Output(), e.Logger.Prefix()+": ", 0)
@@ -276,6 +281,11 @@ func (e *Echo) NewContext(r *http.Request, w http.ResponseWriter) Context {
 func (e *Echo) Router() *Router {
 	return e.router
 }
+
+func (e *Echo) DefaultFinalizeHandler(c Context) {
+	// Noop
+}
+
 
 // DefaultHTTPErrorHandler is the default HTTP error handler. It sends a JSON response
 // with status code.
@@ -518,6 +528,8 @@ func (e *Echo) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		e.HTTPErrorHandler(err, c)
 	}
 
+	e.Finalizer(c)
+	
 	e.pool.Put(c)
 }
 
